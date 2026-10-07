@@ -4,6 +4,9 @@ A bespoke, production-ready personal developer portfolio built with **Next.js Ap
 
 ---
 
+**Live Production URL**: [https://portlionextjs.vercel.app](https://portlionextjs.vercel.app)
+
+---
 ## 🎨 Creative & Visual Identity
 
 - **Theme**: Deep obsidian black (`#070709`) background with warm white (`#f5f5f0`) text and electric lime green (`#ccff00`) accents.
