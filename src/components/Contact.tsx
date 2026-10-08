@@ -19,7 +19,9 @@ export const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    subject: "",
     message: "",
+    botField: "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -77,21 +79,36 @@ export const Contact: React.FC = () => {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) {
-      newErrors.name = "Your name is required";
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
+      newErrors.name = "Full name is required";
+    } else if (trimmedName.length < 2) {
+      newErrors.name = "Name must be at least 2 characters";
+    } else if (trimmedName.length > 100) {
+      newErrors.name = "Name must not exceed 100 characters";
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email.trim()) {
-      newErrors.email = "Your email address is required";
-    } else if (!emailRegex.test(formData.email.trim())) {
-      newErrors.email = "Please enter a valid email address";
+    const emailRegex =
+      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
+      newErrors.email = "Email address is required";
+    } else if (!emailRegex.test(trimmedEmail) || trimmedEmail.length > 254) {
+      newErrors.email = "Please enter a valid email address (e.g. alex@example.com)";
     }
 
-    if (!formData.message.trim()) {
+    const trimmedSubject = formData.subject.trim();
+    if (trimmedSubject.length > 150) {
+      newErrors.subject = "Subject must not exceed 150 characters";
+    }
+
+    const trimmedMessage = formData.message.trim();
+    if (!trimmedMessage) {
       newErrors.message = "Please include a message";
-    } else if (formData.message.trim().length < 5) {
+    } else if (trimmedMessage.length < 5) {
       newErrors.message = "Message must be at least 5 characters";
+    } else if (trimmedMessage.length > 5000) {
+      newErrors.message = "Message must not exceed 5,000 characters";
     }
 
     setErrors(newErrors);
@@ -114,16 +131,25 @@ export const Contact: React.FC = () => {
 
       const data = await res.json();
 
-      if (res.ok) {
+      if (res.ok && data.success) {
         setStatus("success");
         setStatusMessage(
           data.message ||
-            "Your message was received! Bilal will follow up directly."
+            "Your message has been sent successfully! I will reply directly to your email."
         );
-        setFormData({ name: "", email: "", message: "" });
+        setFormData({
+          name: "",
+          email: "",
+          subject: "",
+          message: "",
+          botField: "",
+        });
+        setErrors({});
       } else {
         setStatus("error");
-        setStatusMessage(data.error || "Failed to deliver message. Please try again.");
+        setStatusMessage(
+          data.error || "Failed to deliver message. Please try again or reach out directly."
+        );
       }
     } catch {
       setStatus("error");
@@ -281,17 +307,21 @@ export const Contact: React.FC = () => {
                   </h3>
                 </div>
                 <span className="text-xs font-mono text-neutral-500">
-                  ALL FIELDS REQUIRED
+                  FIELDS WITH * REQUIRED
                 </span>
               </div>
 
               {/* Status Feedback Banners */}
               {status === "success" && (
-                <div className="mb-6 p-4 rounded-xl bg-[#ccff00]/10 border border-[#ccff00]/40 flex items-start gap-3 text-xs sm:text-sm text-neutral-200">
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="mb-6 p-4 rounded-xl bg-[#ccff00]/10 border border-[#ccff00]/40 flex items-start gap-3 text-xs sm:text-sm text-neutral-200"
+                >
                   <CheckCircle2 className="w-5 h-5 text-[#ccff00] shrink-0 mt-0.5" />
                   <div>
                     <strong className="block text-[#ccff00] font-mono uppercase mb-0.5">
-                      Message Registered
+                      Message Sent Successfully
                     </strong>
                     <span>{statusMessage}</span>
                   </div>
@@ -299,7 +329,11 @@ export const Contact: React.FC = () => {
               )}
 
               {status === "error" && (
-                <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/40 flex items-start gap-3 text-xs sm:text-sm text-red-200">
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/40 flex items-start gap-3 text-xs sm:text-sm text-red-200"
+                >
                   <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                   <div>
                     <strong className="block text-red-400 font-mono uppercase mb-0.5">
@@ -311,6 +345,22 @@ export const Contact: React.FC = () => {
               )}
 
               <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+                {/* Honeypot Spam Protection (Hidden from humans) */}
+                <div className="hidden sr-only" aria-hidden="true">
+                  <label htmlFor="contact-botfield">Do not fill this field</label>
+                  <input
+                    id="contact-botfield"
+                    type="text"
+                    name="botField"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={formData.botField}
+                    onChange={(e) =>
+                      setFormData({ ...formData, botField: e.target.value })
+                    }
+                  />
+                </div>
+
                 {/* Name Input */}
                 <div>
                   <label
@@ -321,21 +371,27 @@ export const Contact: React.FC = () => {
                   </label>
                   <input
                     id="contact-name"
+                    name="name"
                     type="text"
+                    autoComplete="name"
+                    aria-required="true"
+                    aria-invalid={Boolean(errors.name)}
+                    aria-describedby={errors.name ? "name-error" : undefined}
+                    disabled={status === "loading"}
                     value={formData.name}
                     onChange={(e) => {
                       setFormData({ ...formData, name: e.target.value });
                       if (errors.name) setErrors({ ...errors, name: "" });
                     }}
                     placeholder="e.g. Alex Henderson"
-                    className={`w-full px-4 py-3.5 rounded-xl bg-neutral-900/80 border text-white text-sm focus:outline-none transition-all ${
+                    className={`w-full px-4 py-3.5 rounded-xl bg-neutral-900/80 border text-white text-sm focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                       errors.name
                         ? "border-red-500 focus:border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                         : "border-white/10 focus:border-[#ccff00] focus:shadow-[0_0_15px_rgba(204,255,0,0.2)]"
                     }`}
                   />
                   {errors.name && (
-                    <span className="text-xs text-red-400 font-mono mt-1.5 block">
+                    <span id="name-error" className="text-xs text-red-400 font-mono mt-1.5 block">
                       {errors.name}
                     </span>
                   )}
@@ -351,22 +407,63 @@ export const Contact: React.FC = () => {
                   </label>
                   <input
                     id="contact-email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
+                    aria-required="true"
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby={errors.email ? "email-error" : undefined}
+                    disabled={status === "loading"}
                     value={formData.email}
                     onChange={(e) => {
                       setFormData({ ...formData, email: e.target.value });
                       if (errors.email) setErrors({ ...errors, email: "" });
                     }}
                     placeholder="e.g. alex@example.com"
-                    className={`w-full px-4 py-3.5 rounded-xl bg-neutral-900/80 border text-white text-sm focus:outline-none transition-all ${
+                    className={`w-full px-4 py-3.5 rounded-xl bg-neutral-900/80 border text-white text-sm focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                       errors.email
                         ? "border-red-500 focus:border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                         : "border-white/10 focus:border-[#ccff00] focus:shadow-[0_0_15px_rgba(204,255,0,0.2)]"
                     }`}
                   />
                   {errors.email && (
-                    <span className="text-xs text-red-400 font-mono mt-1.5 block">
+                    <span id="email-error" className="text-xs text-red-400 font-mono mt-1.5 block">
                       {errors.email}
+                    </span>
+                  )}
+                </div>
+
+                {/* Subject Input (Optional) */}
+                <div>
+                  <label
+                    htmlFor="contact-subject"
+                    className="block text-xs font-mono uppercase tracking-wider text-neutral-400 mb-2"
+                  >
+                    Subject <span className="text-neutral-500 font-normal lowercase">(optional)</span>
+                  </label>
+                  <input
+                    id="contact-subject"
+                    name="subject"
+                    type="text"
+                    autoComplete="off"
+                    aria-invalid={Boolean(errors.subject)}
+                    aria-describedby={errors.subject ? "subject-error" : undefined}
+                    disabled={status === "loading"}
+                    value={formData.subject}
+                    onChange={(e) => {
+                      setFormData({ ...formData, subject: e.target.value });
+                      if (errors.subject) setErrors({ ...errors, subject: "" });
+                    }}
+                    placeholder="e.g. Project Inquiry / Collaboration"
+                    className={`w-full px-4 py-3.5 rounded-xl bg-neutral-900/80 border text-white text-sm focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                      errors.subject
+                        ? "border-red-500 focus:border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                        : "border-white/10 focus:border-[#ccff00] focus:shadow-[0_0_15px_rgba(204,255,0,0.2)]"
+                    }`}
+                  />
+                  {errors.subject && (
+                    <span id="subject-error" className="text-xs text-red-400 font-mono mt-1.5 block">
+                      {errors.subject}
                     </span>
                   )}
                 </div>
@@ -381,21 +478,26 @@ export const Contact: React.FC = () => {
                   </label>
                   <textarea
                     id="contact-message"
+                    name="message"
                     rows={5}
+                    aria-required="true"
+                    aria-invalid={Boolean(errors.message)}
+                    aria-describedby={errors.message ? "message-error" : undefined}
+                    disabled={status === "loading"}
                     value={formData.message}
                     onChange={(e) => {
                       setFormData({ ...formData, message: e.target.value });
                       if (errors.message) setErrors({ ...errors, message: "" });
                     }}
                     placeholder="Describe your idea, project scope, or opportunity..."
-                    className={`w-full px-4 py-3.5 rounded-xl bg-neutral-900/80 border text-white text-sm focus:outline-none transition-all resize-none ${
+                    className={`w-full px-4 py-3.5 rounded-xl bg-neutral-900/80 border text-white text-sm focus:outline-none transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed ${
                       errors.message
                         ? "border-red-500 focus:border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                         : "border-white/10 focus:border-[#ccff00] focus:shadow-[0_0_15px_rgba(204,255,0,0.2)]"
                     }`}
                   />
                   {errors.message && (
-                    <span className="text-xs text-red-400 font-mono mt-1.5 block">
+                    <span id="message-error" className="text-xs text-red-400 font-mono mt-1.5 block">
                       {errors.message}
                     </span>
                   )}
